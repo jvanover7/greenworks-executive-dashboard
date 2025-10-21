@@ -5,33 +5,49 @@ import { DrillDownPanel, DrillDownSection, DrillDownItem } from './ui/DrillDownP
 import InspectionsView from './InspectionsView'
 import BotCallsView from './BotCallsView'
 import ClaudeChat from './ClaudeChat'
-import { metricsApi } from '../utils/api'
+import { fetchAllMetrics, getDataSourceStatus } from '../utils/dataAggregator'
 
 export default function Dashboard({ user }: any) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inspections' | 'bot-calls' | 'chat'>('dashboard')
   const [loading, setLoading] = useState<boolean>(true)
   const [drillDownType, setDrillDownType] = useState<string | null>(null)
 
-  // Mock data - will be replaced with real API calls
+  // Real-time metrics from all data sources
   const [metrics, setMetrics] = useState({
-    totalCalls: 1247,
-    missedCalls: 43,
-    salesOpportunities: 89,
-    conversionRate: 34.2,
-    totalInspections: 342,
-    avgResponseTime: 4.3,
-    customerSatisfaction: 4.7,
+    totalCalls: 0,
+    missedCalls: 0,
+    salesOpportunities: 0,
+    conversionRate: 0,
+    totalInspections: 0,
+    avgResponseTime: 0,
+    customerSatisfaction: 0,
   })
 
+  const [dataSourcesStatus, setDataSourcesStatus] = useState<any>(null)
+
   useEffect(() => {
-    const fetchMetrics = async () => {
+    const loadMetrics = async () => {
       try {
-        // This will use the API client to fetch real data
-        const response = await metricsApi.getAll()
-        if (response.data) {
-          // Update metrics with real data when available
-          console.log('Fetched metrics:', response.data)
-        }
+        // Fetch aggregated metrics from all sources
+        const data = await fetchAllMetrics()
+
+        // Update metrics state with real data
+        setMetrics({
+          totalCalls: data.calls?.totalCalls || 0,
+          missedCalls: data.calls?.missedCalls || 0,
+          salesOpportunities: data.calls?.salesOpportunities || 0,
+          conversionRate: data.calls?.conversionRate || 0,
+          totalInspections: data.inspections?.totalInspections || 0,
+          avgResponseTime: data.calls?.averageDuration || 0,
+          customerSatisfaction: data.botCalls?.customerSatisfaction || 0,
+        })
+
+        // Get data source status
+        const status = getDataSourceStatus()
+        setDataSourcesStatus(status)
+
+        console.log('Dashboard metrics loaded:', data)
+        console.log('Data sources status:', status)
       } catch (err) {
         console.error('Failed to fetch metrics:', err)
       } finally {
@@ -39,8 +55,8 @@ export default function Dashboard({ user }: any) {
       }
     }
 
-    fetchMetrics()
-    const interval = setInterval(fetchMetrics, 30000) // Refresh every 30 seconds
+    loadMetrics()
+    const interval = setInterval(loadMetrics, 30000) // Refresh every 30 seconds
 
     return () => clearInterval(interval)
   }, [])
